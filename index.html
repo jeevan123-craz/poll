@@ -273,6 +273,7 @@
                                 <th>Timestamp</th>
                                 <th>Sender</th>
                                 <th>Duplicates</th>
+                                <th style="width:50px;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="registryBody"></tbody>
@@ -583,6 +584,9 @@
                     <td style="font-family:var(--font-mono); font-size:11px;">${d.time ? d.time.toLocaleString() : '—'}</td>
                     <td>${d.sender || '—'}</td>
                     <td style="color:var(--warning)">${d.dups ? d.dups + 'x' : '—'}</td>
+                    <td>
+                        <button class="cbtn" style="padding:4px 8px; color:var(--danger); border-color:rgba(239,68,68,0.2);" onclick="removeId(${d.id})">🗑️</button>
+                    </td>
                 </tr>
             `).join('');
 
@@ -615,6 +619,14 @@
                 updateUI();
                 notify(`ID ${oldId} changed to ${n}`);
             }
+        }
+
+        function removeId(id) {
+            if (!confirm(`Permanently remove ID #${id} from the registry?`)) return;
+            state.ids.delete(id);
+            state.log = state.log.filter(m => m.id !== id);
+            updateUI();
+            notify(`ID #${id} removed`, 'error');
         }
 
         async function pollTelegram() {
