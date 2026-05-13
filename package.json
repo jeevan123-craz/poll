@@ -1,0 +1,12 @@
+{
+  "name": "jeevankishore-teletrack",
+  "version": "1.0.0",
+  "description": "JeevanKishore TeleTrack Monitoring Dashboard",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}

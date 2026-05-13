@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JeevanKishore — TeleTrack Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.5);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --accent: #8b5cf6;
+            --bg-deep: #020617;
+            --bg-surface: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-elevated: rgba(51, 65, 85, 0.4);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.15);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --font-main: 'Inter', sans-serif;
+            --font-heading: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.light-mode {
+            --bg-deep: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-card: rgba(241, 245, 249, 0.8);
+            --bg-elevated: rgba(226, 232, 240, 0.6);
+            --border: rgba(0, 0, 0, 0.1);
+            --border-hover: rgba(0, 0, 0, 0.2);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --text-dim: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; overflow: hidden; background-color: var(--bg-deep); color: var(--text-main); font-family: var(--font-main); transition: background-color 0.3s; }
+
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background: radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+                        radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 10px; }
+
+        header {
+            height: 72px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between;
+            background: rgba(15, 23, 42, 0.8); border-bottom: 1px solid var(--border); backdrop-filter: blur(20px);
+            z-index: 100; position: relative;
+        }
+
+        .logo { display: flex; align-items: center; gap: 14px; }
+        .logo-box {
+            width: 44px; height: 44px; background: linear-gradient(135deg, #f59e0b, #ef4444);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-heading); font-weight: 800; color: white; font-size: 16px;
+            box-shadow: 0 8px 20px -5px rgba(245, 158, 11, 0.4);
+        }
+
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .status-pill {
+            display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+            background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 99px;
+            font-size: 11px; font-weight: 700; color: var(--text-muted);
+        }
+        .status-pill.active { color: var(--success); border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.05); }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .dot.pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+        .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 72px); }
+        .sidebar { background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .tg-feed { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border); background: rgba(255, 255, 255, 0.02); font-size: 13px; }
+        .msg.new { border-left: 3px solid var(--success); }
+        .msg.dup { border-left: 3px solid var(--warning); }
+        
+        .content { overflow-y: auto; padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+        .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; backdrop-filter: blur(12px); }
+        .ptitle { font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+        .stat-card { padding: 20px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); border-radius: 16px; }
+        .stat-val { font-family: var(--font-heading); font-size: 32px; font-weight: 800; margin: 4px 0; }
+
+        .cbtn {
+            background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; color: var(--text-main);
+            padding: 10px 18px; font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .cbtn:hover { background: var(--border-hover); transform: translateY(-1px); }
+        .cbtn.primary { background: var(--primary); color: white; border: none; }
+        .cbtn.primary:hover { background: #2563eb; }
+
+        .table-wrap { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: rgba(255, 255, 255, 0.02); padding: 14px 16px; text-align: left; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .editable { cursor: pointer; text-decoration: underline dotted var(--text-dim); }
+        .editable:hover { color: var(--primary); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 24px; width: 100%; max-width: 500px; padding: 32px; }
+        .modal-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        
+        .cfg-row { margin-bottom: 16px; }
+        .cfg-label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .cfg-input { width: 100%; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; color: white; padding: 10px 14px; font-size: 13px; outline: none; }
+        .cfg-input:focus { border-color: var(--primary); }
+
+        .id-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 8px; }
+        .chip { height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px; }
+        .chip.present { background: rgba(16, 185, 129, 0.1); border-color: var(--success); color: var(--success); }
+        .chip.missing { background: rgba(239, 68, 68, 0.05); color: var(--text-dim); }
+
+        .notif-area { position: fixed; top: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+        .notif { background: var(--bg-surface); border: 1px solid var(--border); padding: 12px 20px; border-radius: 12px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 20px; }
+        .pag-btn { padding: 6px 12px; border-radius: 6px; background: var(--bg-elevated); border: 1px solid var(--border); cursor: pointer; font-size: 12px; }
+        .pag-btn.active { background: var(--primary); color: white; border: none; }
+
+        @media print {
+            .sidebar, header, .cbtn, .pagination, .ctabs { display: none !important; }
+            .content { padding: 0; }
+            .panel { border: none; background: white; color: black; }
+        }
+    </style>
+</head>
+<body>
+    <div class="notif-area" id="notifArea"></div>
+    
+    <header>
+        <div class="logo">
+            <div class="logo-box">JK</div>
+            <div>
+                <div style="font-weight:700; font-size:18px;">JeevanKishore</div>
+                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">TeleTrack Monitoring</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-pill" id="pollStatusPill">
+                <div class="dot" id="pollDot"></div>
+                <span id="pollText">POLLING INACTIVE</span>
+            </div>
+            <div class="status-pill" id="sheetStatusPill">
+                <div class="dot" id="sheetDot"></div>
+                <span id="sheetText">SHEETS OFFLINE</span>
+            </div>
+            <div class="status-pill" id="timerStatus" style="display:none;">
+                <span id="timerText">00:00</span>
+            </div>
+            <div id="clock" style="font-family:var(--font-mono); font-size:16px;">00:00:00</div>
+            <button class="cbtn" onclick="openModal('settingsModal')">Settings</button>
+            <button class="cbtn" id="themeToggle" onclick="toggleTheme()">🌓</button>
+        </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <div style="padding:20px; border-bottom:1px solid var(--border);">
+                <div class="cfg-label">Manual Input</div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" class="cfg-input" id="manualInp" placeholder="Enter ID..." onkeydown="if(event.key==='Enter')addManual()">
+                    <button class="cbtn primary" onclick="addManual()">ADD</button>
+                </div>
+            </div>
+            <div class="tg-feed" id="msgFeed"></div>
+            <div style="padding:16px; background:var(--bg-elevated); display:flex; flex-direction:column; align-items:center; gap:12px;">
+                <button class="cbtn" style="padding:8px 24px; width:100%;" onclick="togglePolling()" id="pollingBtn">Start Live Polling</button>
+                <div style="font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:2px; font-weight:700;">© JeevanKishore</div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="cfg-label">Total unique IDs</div>
+                    <div class="stat-val" id="statTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="cfg-label">Present (Range)</div>
+                    <div class="stat-val" style="color:var(--success);" id="statPresent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="cfg-label">Missing</div>
+                    <div class="stat-val" style="color:var(--danger);" id="statMissing">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="cfg-label">Completion</div>
+                    <div class="stat-val" style="color:var(--accent);" id="statPct">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="cfg-label">Contributors</div>
+                    <div class="stat-val" style="color:var(--warning);" id="statSenders">0</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div class="ptitle" style="margin:0;">Control Center</div>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <span class="cfg-label" style="margin:0;">Filter Sender:</span>
+                        <select class="cfg-input" style="width:180px;" id="globalSenderFilter" onchange="updateUI()">
+                            <option value="all">All Senders</option>
+                        </select>
+                        <span class="cfg-label" style="margin:0; margin-left:12px;">Range:</span>
+                        <input type="number" class="cfg-input" style="width:80px;" id="rMin" value="1" oninput="updateUI()">
+                        <span>—</span>
+                        <input type="number" class="cfg-input" style="width:80px;" id="rMax" value="50" oninput="updateUI()">
+                        <button class="cbtn" onclick="autoRange()">Auto</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="cbtn primary" onclick="openModal('bulkModal')">Bulk Import</button>
+                    <button class="cbtn" onclick="syncToSheets()">Sync to Sheets</button>
+                    <button class="cbtn" onclick="openModal('graphModal')">📊 Detailed Analytics</button>
+                    <button class="cbtn" onclick="exportFile('xlsx')">Excel Report</button>
+                    <button class="cbtn" onclick="exportFile('csv')">CSV Export</button>
+                    <button class="cbtn" onclick="copyToClipboard()">Copy All</button>
+                    <button class="cbtn" onclick="window.print()">Print</button>
+                    <button class="cbtn" style="color:var(--danger);" onclick="clearData()">Clear Data</button>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 350px; gap:24px;">
+                <div class="panel">
+                    <div class="ptitle">ID Matrix</div>
+                    <div class="id-grid" id="matrixGrid"></div>
+                </div>
+                <div class="panel">
+                    <div class="ptitle">Activity Trend</div>
+                    <div style="height:200px;"><canvas id="trendChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div class="ptitle" style="margin:0;">Registry View</div>
+                    <div style="display:flex; gap:12px;">
+                        <button class="cbtn" onclick="jumpToId()">🔍 Jump to ID</button>
+                        <input type="text" class="cfg-input" style="width:200px;" id="searchInp" placeholder="Search ID..." oninput="renderTable()">
+                        <select class="cfg-input" style="width:140px;" id="filterSelect" onchange="renderTable()">
+                            <option value="all">Show All</option>
+                            <option value="present">Present</option>
+                            <option value="missing">Missing</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>ID Number</th>
+                                <th>Status</th>
+                                <th>Timestamp</th>
+                                <th>Sender</th>
+                                <th>Duplicates</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registryBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-h">
+                <h2 class="heading">Settings</h2>
+                <button class="cbtn" onclick="closeModal('settingsModal')">✕</button>
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Telegram Bot Token</label>
+                <input type="password" class="cfg-input" id="botToken" placeholder="Paste token here...">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Chat ID Filter (Optional)</label>
+                <input type="text" class="cfg-input" id="chatId" placeholder="Leave blank for all">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Polling Interval (ms)</label>
+                <input type="number" class="cfg-input" id="pollInterval" value="2000">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Google Sheets Web App URL</label>
+                <input type="text" class="cfg-input" id="sheetUrl" placeholder="https://script.google.com/macros/s/...">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Auto-Stop Timer (minutes)</label>
+                <input type="number" class="cfg-input" id="cfgTimer" placeholder="0 for infinite">
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                <span class="cfg-label">Sound Alerts</span>
+                <button class="cbtn" id="soundToggle" onclick="toggleSound()">ON</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                <span class="cfg-label">Auto-Sync to Sheets</span>
+                <button class="cbtn" id="sheetSyncToggle" onclick="toggleSheetSync()">OFF</button>
+            </div>
+            <button class="cbtn primary" style="width:100%; margin-top:24px;" onclick="saveSettings()">Save & Close</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="graphModal">
+        <div class="modal" style="max-width:900px;">
+            <div class="modal-h">
+                <h2 class="heading">Detailed Analytics</h2>
+                <button class="cbtn" onclick="closeModal('graphModal')">✕</button>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                <div class="panel" style="background:var(--bg-deep);">
+                    <div class="ptitle">Coverage Breakdown</div>
+                    <div style="height:250px;"><canvas id="pieChart"></canvas></div>
+                </div>
+                <div class="panel" style="background:var(--bg-deep);">
+                    <div class="ptitle">Top Contributors</div>
+                    <div style="height:250px;"><canvas id="senderBarChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+        <div class="modal">
+            <div class="modal-h">
+                <h2 class="heading">Bulk Import</h2>
+                <button class="cbtn" onclick="closeModal('bulkModal')">✕</button>
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Comma separated list or Range (1-50)</label>
+                <textarea class="cfg-input" id="bulkText" rows="4" placeholder="1,2,5,10-20"></textarea>
+            </div>
+            <button class="cbtn primary" style="width:100%;" onclick="processBulk()">Process Import</button>
+            <div style="text-align:center; margin-top:16px;">
+                <span class="cfg-label">OR</span>
+                <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCSV(this)">
+                <button class="cbtn" style="width:100%; margin-top:8px;" onclick="document.getElementById('csvFileInput').click()">Upload CSV File</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            ids: new Map(),
+            log: [],
+            senders: new Set(),
+            botToken: localStorage.getItem('tp_token') || '8323871408:AAF-zGGBenAFOB-irMFCid1BmQPKsb6itx0',
+            chatId: localStorage.getItem('tp_chatid') || '8551430828',
+            pollInterval: parseInt(localStorage.getItem('tp_interval')) || 2000,
+            soundEnabled: localStorage.getItem('tp_sound') !== 'false',
+            timerMinutes: parseInt(localStorage.getItem('tp_timer')) || 0,
+            timerRemaining: 0,
+            sheetUrl: localStorage.getItem('tp_sheet_url') || '',
+            sheetSyncEnabled: localStorage.getItem('tp_sheet_sync') === 'true',
+            theme: localStorage.getItem('tp_theme') || 'dark',
+            isPolling: false,
+            lastUpdateId: 0,
+            pollTimer: null,
+            page: 1,
+            pageSize: 15,
+            history: []
+        };
+
+        const trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Arrival Rate', data: [], borderColor: '#3b82f6', tension: 0.4, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.1)' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { beginAtZero: true, ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+        });
+
+        function notify(msg, type = 'info') {
+            const area = document.getElementById('notifArea');
+            const n = document.createElement('div');
+            n.className = 'notif';
+            n.textContent = msg;
+            n.style.borderLeft = `4px solid ${type === 'error' ? 'var(--danger)' : 'var(--success)'}`;
+            area.appendChild(n);
+            setTimeout(() => n.remove(), 3000);
+            if (type === 'success' && state.soundEnabled) document.getElementById('alertSound')?.play().catch(()=>{});
+        }
+
+        function updateClock() {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        function addId(id, sender = 'System', silent = false, chatId = null, msgId = null) {
+            const n = parseInt(id);
+            if (isNaN(n) || n < 1) return;
+            
+            if (sender !== 'System' && sender !== 'Bulk' && sender !== 'Manual') {
+                state.senders.add(sender);
+            }
+            
+            let status = 'new';
+            if (state.ids.has(n)) {
+                const entry = state.ids.get(n);
+                entry.dups = (entry.dups || 1) + 1;
+                status = 'dup';
+            } else {
+                state.ids.set(n, { time: new Date(), sender, dups: 0, chatId, msgId });
+                if (!silent) notify(`ID #${n} Received`, 'success');
+            }
+
+            const msg = { id: n, sender, time: new Date(), status, chatId, msgId };
+            state.log.unshift(msg);
+            if (state.log.length > 200) state.log.pop();
+            
+            renderFeed();
+            updateUI();
+        }
+
+        function renderFeed() {
+            const f = document.getElementById('msgFeed');
+            f.innerHTML = state.log.slice(0, 15).map(m => `
+                <div class="msg ${m.status}" style="background: ${m.sender === 'Manual' ? 'rgba(59,130,246,0.05)' : 'rgba(255,255,255,0.02)'}">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="font-weight:700; color:var(--primary); font-size:11px;">@${m.sender}</span>
+                        <div style="display:flex; gap:8px;">
+                            ${m.msgId ? `<span style="cursor:pointer;" title="Reply" onclick="openReplyModal(${m.chatId}, ${m.msgId})">↩️</span>` : ''}
+                            ${m.msgId ? `<span style="cursor:pointer;" title="Pin" onclick="pinMessage(${m.chatId}, ${m.msgId})">📌</span>` : ''}
+                            <span style="font-size:10px; color:var(--text-dim);">${m.time.toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                    <div>${m.status === 'dup' ? '🔁' : '📩'} ID Number: <b>${m.id}</b></div>
+                </div>
+            `).join('');
+        }
+
+        function addManual() {
+            const inp = document.getElementById('manualInp');
+            const v = inp.value.trim();
+            if (!v) return;
+            addId(v, 'Manual');
+            inp.value = '';
+        }
+
+        function updateUI() {
+            const rMin = parseInt(document.getElementById('rMin').value) || 1;
+            const rMax = parseInt(document.getElementById('rMax').value) || 50;
+            const senderFilter = document.getElementById('globalSenderFilter').value;
+            const totalInRange = rMax - rMin + 1;
+            
+            // Update Sender Dropdown
+            const select = document.getElementById('globalSenderFilter');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="all">All Senders</option>';
+            Array.from(state.senders).sort().forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                select.appendChild(opt);
+            });
+            select.value = currentVal;
+
+            let present = 0;
+            const matrix = document.getElementById('matrixGrid');
+            matrix.innerHTML = '';
+            
+            for (let i = rMin; i <= rMax; i++) {
+                const entry = state.ids.get(i);
+                let isPres = !!entry;
+                if (isPres && senderFilter !== 'all' && entry.sender !== senderFilter) {
+                    isPres = false;
+                }
+                
+                if (isPres) present++;
+                const chip = document.createElement('div');
+                chip.className = `chip ${isPres ? 'present' : 'missing'}`;
+                chip.textContent = i;
+                matrix.appendChild(chip);
+            }
+
+            const pct = totalInRange > 0 ? Math.round((present / totalInRange) * 100) : 0;
+            document.getElementById('statTotal').textContent = state.ids.size;
+            document.getElementById('statPresent').textContent = present;
+            document.getElementById('statMissing').textContent = totalInRange - present;
+            document.getElementById('statPct').textContent = pct + '%';
+            document.getElementById('statSenders').textContent = state.senders.size;
+
+            state.history.push(present);
+            if (state.history.length > 20) state.history.shift();
+            trendChart.data.labels = state.history.map((_,i) => i);
+            trendChart.data.datasets[0].data = state.history;
+            trendChart.update('none');
+
+            updateAnalytics();
+            renderTable();
+        }
+
+        let pieChart, barChart;
+        function updateAnalytics() {
+            const rMin = parseInt(document.getElementById('rMin').value) || 1;
+            const rMax = parseInt(document.getElementById('rMax').value) || 50;
+            const total = rMax - rMin + 1;
+            let present = 0;
+            const senderCounts = {};
+
+            for (let i = rMin; i <= rMax; i++) {
+                const e = state.ids.get(i);
+                if (e) {
+                    present++;
+                    senderCounts[e.sender] = (senderCounts[e.sender] || 0) + 1;
+                }
+            }
+
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            if (pieChart) pieChart.destroy();
+            pieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Present', 'Missing'],
+                    datasets: [{
+                        data: [present, total - present],
+                        backgroundColor: ['#10b981', 'rgba(255,255,255,0.05)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } } }
+            });
+
+            // Bar Chart
+            const barCtx = document.getElementById('senderBarChart').getContext('2d');
+            if (barChart) barChart.destroy();
+            const sortedSenders = Object.entries(senderCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedSenders.map(s => s[0]),
+                    datasets: [{
+                        label: 'IDs Contributed',
+                        data: sortedSenders.map(s => s[1]),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#64748b' } }, y: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
+            });
+        }
+
+        function renderTable() {
+            const q = document.getElementById('searchInp').value.toLowerCase();
+            const filter = document.getElementById('filterSelect').value;
+            const rMin = parseInt(document.getElementById('rMin').value) || 1;
+            const rMax = parseInt(document.getElementById('rMax').value) || 50;
+
+            let data = [];
+            for (let i = rMin; i <= rMax; i++) {
+                const entry = state.ids.get(i);
+                if (filter === 'present' && !entry) continue;
+                if (filter === 'missing' && entry) continue;
+                if (q && !String(i).includes(q)) continue;
+                data.push({ id: i, ...entry });
+            }
+
+            const start = (state.page - 1) * state.pageSize;
+            const paginated = data.slice(start, start + state.pageSize);
+            
+            document.getElementById('registryBody').innerHTML = paginated.map((d, i) => `
+                <tr>
+                    <td>${start + i + 1}</td>
+                    <td class="editable" onclick="editId(${d.id})">${d.id}</td>
+                    <td><span style="color:${d.time ? 'var(--success)' : 'var(--text-dim)'}">${d.time ? 'PRESENT' : 'MISSING'}</span></td>
+                    <td style="font-family:var(--font-mono); font-size:11px;">${d.time ? d.time.toLocaleString() : '—'}</td>
+                    <td>${d.sender || '—'}</td>
+                    <td style="color:var(--warning)">${d.dups ? d.dups + 'x' : '—'}</td>
+                </tr>
+            `).join('');
+
+            renderPagination(data.length);
+        }
+
+        function renderPagination(total) {
+            const pages = Math.ceil(total / state.pageSize);
+            const p = document.getElementById('pagination');
+            p.innerHTML = '';
+            for (let i = 1; i <= pages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `pag-btn ${state.page === i ? 'active' : ''}`;
+                btn.textContent = i;
+                btn.onclick = () => { state.page = i; renderTable(); };
+                p.appendChild(btn);
+            }
+        }
+
+        function editId(oldId) {
+            const newVal = prompt("Edit ID Number:", oldId);
+            if (newVal === null) return;
+            const n = parseInt(newVal);
+            if (isNaN(n) || n === oldId) return;
+            
+            const entry = state.ids.get(oldId);
+            if (entry) {
+                state.ids.delete(oldId);
+                state.ids.set(n, entry);
+                updateUI();
+                notify(`ID ${oldId} changed to ${n}`);
+            }
+        }
+
+        async function pollTelegram() {
+            if (!state.botToken) return;
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${state.botToken}/getUpdates?offset=${state.lastUpdateId + 1}&timeout=30`);
+                const data = await res.json();
+                if (data.ok) {
+                    data.result.forEach(u => {
+                        state.lastUpdateId = u.update_id;
+                        const msg = u.message || u.channel_post;
+                        if (!msg) return;
+                        const text = msg.text || msg.caption || '';
+                        const sender = msg.from?.username || msg.from?.first_name || msg.chat?.title || 'Bot';
+                        const chatId = msg.chat?.id;
+                        const msgId = msg.message_id;
+                        
+                        if (state.chatId && String(chatId) !== state.chatId) return;
+                        
+                        // Refined Regex to catch numbers embedded in symbols
+                        const matches = text.match(/\d+/g);
+                        if (matches) {
+                            matches.forEach(m => addId(m, sender, false, chatId, msgId));
+                        }
+                    });
+                }
+            } catch (e) { console.error(e); }
+            if (state.isPolling) state.pollTimer = setTimeout(pollTelegram, state.pollInterval);
+        }
+
+        function togglePolling() {
+            if (!state.botToken) { notify('Set Bot Token in Settings first', 'error'); return; }
+            state.isPolling = !state.isPolling;
+            const btn = document.getElementById('pollingBtn');
+            const pill = document.getElementById('pollStatusPill');
+            const dot = document.getElementById('pollDot');
+            
+            if (state.isPolling) {
+                btn.textContent = 'Stop Live Polling';
+                pill.classList.add('active');
+                dot.classList.add('pulse');
+                document.getElementById('pollText').textContent = 'LIVE POLLING ACTIVE';
+                startTimer();
+                pollTelegram();
+            } else {
+                btn.textContent = 'Start Live Polling';
+                pill.classList.remove('active');
+                dot.classList.remove('pulse');
+                document.getElementById('pollText').textContent = 'POLLING INACTIVE';
+                clearTimeout(state.pollTimer);
+                hideTimer();
+            }
+        }
+
+        function startTimer() {
+            if (state.timerMinutes <= 0) return;
+            state.timerRemaining = state.timerMinutes * 60;
+            const tDiv = document.getElementById('timerStatus');
+            tDiv.style.display = 'flex';
+            updateTimerUI();
+            state.timerInterval = setInterval(() => {
+                state.timerRemaining--;
+                updateTimerUI();
+                if (state.timerRemaining <= 0) {
+                    stopPolling();
+                    notify("Polling stopped by timer", "warn");
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            const m = Math.floor(state.timerRemaining / 60);
+            const s = state.timerRemaining % 60;
+            document.getElementById('timerText').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        }
+
+        function hideTimer() {
+            clearInterval(state.timerInterval);
+            document.getElementById('timerStatus').style.display = 'none';
+        }
+
+        function stopPolling() {
+            if (state.isPolling) togglePolling();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+        function saveSettings() {
+            state.botToken = document.getElementById('botToken').value;
+            state.chatId = document.getElementById('chatId').value;
+            state.pollInterval = parseInt(document.getElementById('pollInterval').value);
+            state.sheetUrl = document.getElementById('sheetUrl').value;
+            state.timerMinutes = parseInt(document.getElementById('cfgTimer').value) || 0;
+            
+            localStorage.setItem('tp_token', state.botToken);
+            localStorage.setItem('tp_chatid', state.chatId);
+            localStorage.setItem('tp_interval', state.pollInterval);
+            localStorage.setItem('tp_sheet_url', state.sheetUrl);
+            localStorage.setItem('tp_timer', state.timerMinutes);
+            
+            closeModal('settingsModal');
+            notify('Settings Saved');
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            localStorage.setItem('tp_sound', state.soundEnabled);
+            document.getElementById('soundToggle').textContent = state.soundEnabled ? 'ON' : 'OFF';
+        }
+
+        function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            document.body.classList.toggle('light-mode', state.theme === 'light');
+            localStorage.setItem('tp_theme', state.theme);
+        }
+
+        function processBulk() {
+            const text = document.getElementById('bulkText').value;
+            const parts = text.split(/[,\n]/);
+            parts.forEach(p => {
+                p = p.trim();
+                if (p.includes('-')) {
+                    const [s, e] = p.split('-').map(Number);
+                    for (let i = s; i <= e; i++) addId(i, 'Bulk', true);
+                } else {
+                    addId(p, 'Bulk', true);
+                }
+            });
+            notify('Bulk Import Complete');
+            closeModal('bulkModal');
+        }
+
+        function handleCSV(input) {
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const rows = e.target.result.split('\n');
+                rows.forEach(r => addId(r.split(',')[0].trim(), 'CSV Import', true));
+                notify('CSV Imported Successfully');
+                closeModal('bulkModal');
+            };
+            reader.readAsText(file);
+        }
+
+        function exportFile(type) {
+            const wb = XLSX.utils.book_new();
+            const data = Array.from(state.ids.entries()).map(([id, info]) => ({
+                ID: id,
+                Status: 'PRESENT',
+                Time: info.time.toLocaleString(),
+                Sender: info.sender,
+                Duplicates: info.dups
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, "Registry");
+            if (type === 'xlsx') XLSX.writeFile(wb, "TeleTrack_Export.xlsx");
+            else {
+                const csv = XLSX.utils.sheet_to_csv(ws);
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'TeleTrack_Export.csv'; a.click();
+            }
+        }
+
+        function copyToClipboard() {
+            const text = Array.from(state.ids.keys()).join(', ');
+            navigator.clipboard.writeText(text);
+            notify('All IDs copied to clipboard');
+        }
+
+        function clearData() {
+            if (confirm('Clear all data?')) {
+                state.ids.clear();
+                state.log = [];
+                state.senders.clear();
+                state.history = [];
+                updateUI();
+                notify('Data Cleared', 'error');
+            }
+        }
+
+        function autoRange() {
+            const keys = Array.from(state.ids.keys());
+            if (keys.length === 0) return;
+            document.getElementById('rMin').value = Math.min(...keys);
+            document.getElementById('rMax').value = Math.max(...keys);
+            updateUI();
+        }
+
+        function jumpToId() {
+            const id = prompt("Jump to ID Number:");
+            if (!id) return;
+            document.getElementById('searchInp').value = id;
+            renderTable();
+            notify(`Filtered for ID #${id}`);
+        }
+
+        function openReplyModal(chatId, msgId) {
+            const text = prompt("Send reply to Telegram:");
+            if (!text) return;
+            fetch(`https://api.telegram.org/bot${state.botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text: text, reply_to_message_id: msgId })
+            }).then(() => notify("Reply sent!")).catch(() => notify("Reply failed", "error"));
+        }
+
+        function pinMessage(chatId, msgId) {
+            if (!confirm("Pin this message in Telegram?")) return;
+            fetch(`https://api.telegram.org/bot${state.botToken}/pinChatMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, message_id: msgId })
+            }).then(() => notify("Message Pinned!")).catch(() => notify("Pin failed", "error"));
+        }
+
+        async function syncToSheets() {
+            if (!state.sheetUrl) { notify('Set Google Sheets URL in Settings', 'error'); return; }
+            const pill = document.getElementById('sheetStatusPill');
+            const dot = document.getElementById('sheetDot');
+            pill.classList.add('active');
+            dot.classList.add('pulse');
+            document.getElementById('sheetText').textContent = 'SYNCING...';
+            const data = Array.from(state.ids.entries()).map(([id, info]) => ({
+                id, time: info.time.toISOString(), sender: info.sender, dups: info.dups
+            }));
+            try {
+                await fetch(state.sheetUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'sync', data })
+                });
+                notify('Synced to Google Sheets', 'success');
+                document.getElementById('sheetText').textContent = 'SHEETS SYNCED';
+            } catch (e) {
+                notify('Sheets Sync Failed', 'error');
+                document.getElementById('sheetText').textContent = 'SYNC ERROR';
+            }
+            setTimeout(() => {
+                pill.classList.remove('active');
+                dot.classList.remove('pulse');
+                if (document.getElementById('sheetText').textContent !== 'SHEETS SYNCED') {
+                    document.getElementById('sheetText').textContent = 'SHEETS OFFLINE';
+                }
+            }, 3000);
+        }
+
+        function toggleSheetSync() {
+            state.sheetSyncEnabled = !state.sheetSyncEnabled;
+            localStorage.setItem('tp_sheet_sync', state.sheetSyncEnabled);
+            document.getElementById('sheetSyncToggle').textContent = state.sheetSyncEnabled ? 'ON' : 'OFF';
+            if (state.sheetSyncEnabled) syncToSheets();
+        }
+
+        window.onkeydown = (e) => {
+            if (e.key === 'Escape') document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+            if (e.ctrlKey && e.key === 's') { e.preventDefault(); openModal('settingsModal'); }
+        };
+
+        if (state.theme === 'light') document.body.classList.add('light-mode');
+        document.getElementById('soundToggle').textContent = state.soundEnabled ? 'ON' : 'OFF';
+        document.getElementById('sheetSyncToggle').textContent = state.sheetSyncEnabled ? 'ON' : 'OFF';
+        document.getElementById('botToken').value = state.botToken;
+        document.getElementById('chatId').value = state.chatId;
+        document.getElementById('sheetUrl').value = state.sheetUrl;
+        document.getElementById('cfgTimer').value = state.timerMinutes;
+
+        localStorage.setItem('tp_token', state.botToken);
+        localStorage.setItem('tp_chatid', state.chatId);
+        
+        updateUI();
+    </script>
+    <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"></audio>
+</body>
+</html>
