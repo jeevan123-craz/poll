@@ -363,6 +363,16 @@
         // Load data from localStorage
         const savedData = JSON.parse(localStorage.getItem('tp_data') || '{"ids":[], "log":[], "senders":[]}');
         
+        // Support for "Sticky Links" via URL Parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const pSheet = urlParams.get('s');
+        const pToken = urlParams.get('t');
+        const pChat = urlParams.get('c');
+
+        if (pSheet) localStorage.setItem('tp_sheet_url', pSheet);
+        if (pToken) localStorage.setItem('tp_token', pToken);
+        if (pChat) localStorage.setItem('tp_chatid', pChat);
+
         const state = {
             ids: new Map(savedData.ids.map(i => [i.id, { ...i, time: new Date(i.time) }])),
             log: savedData.log.map(m => ({ ...m, time: new Date(m.time) })),
